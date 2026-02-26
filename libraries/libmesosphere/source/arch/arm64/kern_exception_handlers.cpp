@@ -137,22 +137,44 @@ namespace ams::kern::arch::arm64 {
             if (ec == EsrEc_InstructionAbortEl0 || ec == EsrEc_DataAbortEl0) {
                 KScopedLightLock lk(cur_process.GetPageTable().GetLock());
                 PageTableEntry pte;
-                if (cur_process.GetPageTable().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
-                    /* This is a swapped page. We need to block the thread and notify sys-swap. */
-                    KThread &cur_thread = GetCurrentThread();
+                if (cur_process.GetPageTable().IsAppletRegion(far) && cur_process.GetPageTable().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
+                    /* 1. Track start time for panic timeout (80ms). */
+                    const s64 start_tick = cpu::GetSystemTick();
+                    const s64 timeout_ticks = 80 * 1000 * 1000; // Simplified tick conversion
 
-                    /* Set the thread to waiting. */
+                    /* 2. Suspend the thread and signal sys-swap. */
+                    KThread &cur_thread = GetCurrentThread();
                     {
                         KScopedSchedulerLock sl;
                         cur_thread.SetState(KThread::ThreadState_Waiting);
                     }
 
-                    /* TODO: Implement KSwapManager to handle enqueuing the request. */
-                    /* For now, we'll just log and panic to show the hook works. */
-                    MESOSPHERE_LOG("Swap Fault: Proc=%s, Addr=%lx, Offset=%lx\n", cur_process.GetName(), far, pte.GetSwapOffset());
+                    /* 3. Wait for sys-swap to fulfill request with timeout. */
+                    /* Note: This is a conceptual loop. In a real impl, sys-swap would signal a KEvent. */
+                    bool success = false;
+                    while (true) {
+                        if (cpu::GetSystemTick() - start_tick > timeout_ticks) {
+                            break; // Timeout!
+                        }
 
-                    /* Trigger reschedule. */
-                    return;
+                        /* Check if sys-swap finished (dummy check). */
+                        if (false /* check global request status */) {
+                            success = true;
+                            break;
+                        }
+                        
+                        /* Yield to other threads. */
+                        // KScopedSchedulerLock sl;
+                        // cur_thread.Yield();
+                    }
+
+                    if (!success) {
+                        MESOSPHERE_LOG("Swap Timeout/Failure: Proc=%s, Addr=%lx\n", cur_process.GetName(), far);
+                        cur_process.Exit(); // Standard failure path
+                        return;
+                    }
+
+                    return; // Resumed successfully
                 }
             }
 

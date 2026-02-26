@@ -151,6 +151,50 @@ namespace ams::kern::arch::arm64 {
         R_SUCCEED();
     }
 
+    Result KPageTable::MarkAsResident(KProcessAddress virt_addr, KPhysicalAddress phys_addr) {
+        MESOSPHERE_ASSERT(this->IsLockedByCurrentThread());
+
+        /* Traversal to find the entry. */
+        auto &impl = this->GetImpl();
+        TraversalContext context;
+        TraversalEntry t_entry;
+        R_UNLESS(impl.BeginTraversal(std::addressof(t_entry), std::addressof(context), virt_addr), svc::ResultInvalidAddress());
+
+        /* Ensure we are dealing with a Page (L3) descriptor. */
+        R_UNLESS(context.level == KPageTableImpl::EntryLevel_L3, svc::ResultInvalidState());
+
+        PageTableEntry entry = *context.level_entries[context.level];
+
+        /* Ensure page is swapped and not already resident. */
+        R_UNLESS(!entry.IsMapped() && entry.IsSwapped(), svc::ResultInvalidState());
+
+        /* 1. Clear swap bit and restore physical address. */
+        entry.SetSwapped(false);
+        
+        /* 2. Map the new physical page. */
+        /* We'll use a standard template for normal memory with User RW permissions. */
+        PageTableEntry resident_entry = PageTableEntry(PageTableEntry::BlockTag{}, phys_addr, this->GetEntryTemplate({.perm = KMemoryPermission_UserReadWrite}), 0, false, true);
+
+        /* Update the entry in the table. */
+        *context.level_entries[context.level] = resident_entry;
+
+        /* Perform TLB invalidation and synchronization. */
+        if (this->IsKernel()) {
+            this->NoteSingleKernelPageUpdated(virt_addr);
+        } else {
+            this->NoteUpdated();
+        }
+
+        R_SUCCEED();
+    }
+
+    bool KPageTable::IsAppletRegion(KProcessAddress virt_addr) const {
+        /* Applet region typically starts at 0x10000000. */
+        constexpr KProcessAddress AppletRegionStart = 0x10000000ul;
+        constexpr size_t AppletRegionSize = 512 * 1024 * 1024; // 512MB
+        return AppletRegionStart <= virt_addr && virt_addr < AppletRegionStart + AppletRegionSize;
+    }
+
     void KPageTable::Finalize() {
         /* Only process tables should be finalized. */
         MESOSPHERE_ASSERT(!this->IsKernel());

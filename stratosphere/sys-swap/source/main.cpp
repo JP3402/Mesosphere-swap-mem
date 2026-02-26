@@ -29,6 +29,13 @@ namespace ams {
         os::NativeHandle thread_handle;
     };
 
+    bool IsSdBusBusy() {
+        /* Tegra X1 SDMMC4 Present State Register. */
+        volatile u32 *SDMMC4_PSTR = reinterpret_cast<volatile u32 *>(0x700B0624);
+        /* Check bit 0 (Command Inhibit) and bit 1 (Data Inhibit). */
+        return (*SDMMC4_PSTR & 0x3) != 0;
+    }
+
     void Main() {
         os::SetThreadNamePointer(os::GetCurrentThread(), "sys-swap.Main");
 
@@ -39,6 +46,13 @@ namespace ams {
         while (true) {
             /* TODO: Wait for KEvent from kernel. */
             // os::WaitEvent(g_SwapEvent);
+
+            /* Hardware Gatekeeper Logic:
+               Only allow I/O when the bus is idle to ensure high priority for game assets.
+            */
+            while (IsSdBusBusy()) {
+                os::SleepThread(TimeSpan::FromMilliseconds(5));
+            }
 
             /* Dummy Logic:
                - Dequeue request.
