@@ -132,6 +132,30 @@ namespace ams::kern::arch::arm64 {
             }
 
             KProcess &cur_process = GetCurrentProcess();
+
+            /* Check if this is a swap fault. */
+            if (ec == EsrEc_InstructionAbortEl0 || ec == EsrEc_DataAbortEl0) {
+                KScopedLightLock lk(cur_process.GetPageTable().GetLock());
+                PageTableEntry pte;
+                if (cur_process.GetPageTable().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
+                    /* This is a swapped page. We need to block the thread and notify sys-swap. */
+                    KThread &cur_thread = GetCurrentThread();
+
+                    /* Set the thread to waiting. */
+                    {
+                        KScopedSchedulerLock sl;
+                        cur_thread.SetState(KThread::ThreadState_Waiting);
+                    }
+
+                    /* TODO: Implement KSwapManager to handle enqueuing the request. */
+                    /* For now, we'll just log and panic to show the hook works. */
+                    MESOSPHERE_LOG("Swap Fault: Proc=%s, Addr=%lx, Offset=%lx\n", cur_process.GetName(), far, pte.GetSwapOffset());
+
+                    /* Trigger reschedule. */
+                    return;
+                }
+            }
+
             bool should_process_user_exception = KTargetSystem::IsUserExceptionHandlersEnabled();
 
             /* In the event that we return from this exception, we want SPSR.SS set so that we advance an instruction if single-stepping. */

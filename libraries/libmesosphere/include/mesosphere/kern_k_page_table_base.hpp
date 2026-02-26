@@ -378,6 +378,8 @@ namespace ams::kern {
 
             KBlockInfoManager *GetBlockInfoManager() const { return m_block_info_manager; }
 
+            KLightLock &GetLock() const { return m_general_lock; }
+
             Result SetMemoryPermission(KProcessAddress addr, size_t size, ams::svc::MemoryPermission perm);
             Result SetProcessMemoryPermission(KProcessAddress addr, size_t size, ams::svc::MemoryPermission perm);
             Result SetMemoryAttribute(KProcessAddress addr, size_t size, u32 mask, u32 attr);

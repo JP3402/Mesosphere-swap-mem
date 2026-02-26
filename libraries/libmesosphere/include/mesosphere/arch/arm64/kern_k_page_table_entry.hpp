@@ -79,6 +79,7 @@ namespace ams::kern::arch::arm64 {
                 SoftwareReservedBit_DisableMergeHeadAndBody = (1u << 1),
                 SoftwareReservedBit_DisableMergeHeadTail    = (1u << 2),
                 SoftwareReservedBit_Valid                   = (1u << 3),
+                SoftwareReservedBit_Swapped                 = (1u << 4),
             };
 
             static constexpr ALWAYS_INLINE std::underlying_type<SoftwareReservedBit>::type EncodeSoftwareReservedBits(bool head, bool head_body, bool tail) {
@@ -90,6 +91,7 @@ namespace ams::kern::arch::arm64 {
                 ExtensionFlag_DisableMergeHeadAndBody = (static_cast<u64>(SoftwareReservedBit_DisableMergeHeadAndBody) << 55),
                 ExtensionFlag_DisableMergeTail        = (static_cast<u64>(SoftwareReservedBit_DisableMergeHeadTail)    << 55),
                 ExtensionFlag_Valid                   = (static_cast<u64>(SoftwareReservedBit_Valid)                   << 55),
+                ExtensionFlag_Swapped                 = (static_cast<u64>(SoftwareReservedBit_Swapped)                 << 55),
 
                 ExtensionFlag_ValidAndMapped = (ExtensionFlag_Valid | MappingFlag_Mapped),
                 ExtensionFlag_TestTableMask  = (ExtensionFlag_Valid | (1ul << 1)),
@@ -175,7 +177,8 @@ namespace ams::kern::arch::arm64 {
                 }
             }
         public:
-            constexpr ALWAYS_INLINE u8 GetSoftwareReservedBits()            const { return this->GetBits(55, 3); }
+            constexpr ALWAYS_INLINE u8 GetSoftwareReservedBits()            const { return this->GetBits(55, 5); }
+            constexpr ALWAYS_INLINE bool IsSwapped()                        const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_Swapped) != 0; }
             constexpr ALWAYS_INLINE bool IsHeadMergeDisabled()              const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_DisableMergeHead) != 0; }
             constexpr ALWAYS_INLINE bool IsHeadAndBodyMergeDisabled()       const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_DisableMergeHeadAndBody) != 0; }
             constexpr ALWAYS_INLINE bool IsTailMergeDisabled()              const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_DisableMergeHeadTail) != 0; }
@@ -218,6 +221,10 @@ namespace ams::kern::arch::arm64 {
             constexpr ALWAYS_INLINE decltype(auto) SetUserAccessible(bool en)         { this->SetBit(6, en); return *this; }
             constexpr ALWAYS_INLINE decltype(auto) SetPageAttribute(PageAttribute a)  { this->SetBitsDirect(2, 3, a); return *this; }
             constexpr ALWAYS_INLINE decltype(auto) SetMapped(bool m)                  { static_assert(static_cast<u64>(MappingFlag_Mapped == (1 << 0))); this->SetBit(0, m); return *this; }
+            constexpr ALWAYS_INLINE decltype(auto) SetSwapped(bool en)                { this->SetBit(59, en); return *this; }
+
+            constexpr ALWAYS_INLINE u64 GetSwapOffset() const { return this->GetBits(12, 36); }
+            constexpr ALWAYS_INLINE decltype(auto) SetSwapOffset(u64 offset) { this->SetBits(12, 36, offset); return *this; }
 
             constexpr ALWAYS_INLINE size_t GetTableReferenceCount() const { return this->GetBits(2, 10); }
             constexpr ALWAYS_INLINE decltype(auto) SetTableReferenceCount(size_t num) { this->SetBits(2, 10, num); return *this; }

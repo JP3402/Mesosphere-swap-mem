@@ -1028,6 +1028,56 @@ namespace ams::kern::arch::arm64 {
         R_SUCCEED();
     }
 
+    bool KPageTable::GetEntry(PageTableEntry *out, KProcessAddress virt_addr) const {
+        MESOSPHERE_ASSERT(this->IsLockedByCurrentThread());
+
+        auto &impl = this->GetImpl();
+        TraversalContext context;
+        TraversalEntry entry;
+
+        if (impl.BeginTraversal(std::addressof(entry), std::addressof(context), virt_addr)) {
+            *out = *context.level_entries[context.level];
+            return true;
+        }
+
+        return false;
+    }
+
+    Result KPageTable::MarkAsSwapped(KProcessAddress virt_addr, u64 sector_offset) {
+        MESOSPHERE_ASSERT(this->IsLockedByCurrentThread());
+
+        /* Traversal to find the entry. */
+        auto &impl = this->GetImpl();
+        TraversalContext context;
+        TraversalEntry t_entry;
+        R_UNLESS(impl.BeginTraversal(std::addressof(t_entry), std::addressof(context), virt_addr), svc::ResultInvalidAddress());
+
+        /* Ensure we are dealing with a Page (L3) and not a Table descriptor. */
+        R_UNLESS(context.level == KPageTableImpl::EntryLevel_L3, svc::ResultInvalidState());
+
+        PageTableEntry entry = *context.level_entries[context.level];
+
+        /* Ensure page is resident and not already swapped. */
+        R_UNLESS(entry.IsMapped() && !entry.IsSwapped(), svc::ResultInvalidState());
+
+        /* Mark as swapped and store offset. */
+        entry.SetMapped(false);
+        entry.SetSwapped(true);
+        entry.SetSwapOffset(sector_offset);
+
+        /* Update the entry in the table. */
+        *context.level_entries[context.level] = entry;
+
+        /* Perform TLB invalidation and synchronization. */
+        if (this->IsKernel()) {
+            this->NoteSingleKernelPageUpdated(virt_addr);
+        } else {
+            this->NoteUpdated();
+        }
+
+        R_SUCCEED();
+    }
+
     void KPageTable::FinalizeUpdateImpl(PageLinkedList *page_list) {
         while (page_list->Peek()) {
             KVirtualAddress page = KVirtualAddress(page_list->Pop());

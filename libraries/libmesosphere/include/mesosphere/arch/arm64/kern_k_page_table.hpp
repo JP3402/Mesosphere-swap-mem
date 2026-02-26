@@ -201,6 +201,9 @@ namespace ams::kern::arch::arm64 {
             NOINLINE Result InitializeForProcess(ams::svc::CreateProcessFlag flags, bool from_back, KMemoryManager::Pool pool, KProcessAddress code_address, size_t code_size, KSystemResource *system_resource, KResourceLimit *resource_limit, size_t process_index);
             void Finalize();
 
+            bool GetEntry(PageTableEntry *out, KProcessAddress virt_addr) const;
+            Result MarkAsSwapped(KProcessAddress virt_addr, u64 sector_offset);
+
             static void NoteUpdatedCallback(const void *pt) {
                 /* Note the update. */
                 static_cast<const KPageTable *>(pt)->NoteUpdated();
