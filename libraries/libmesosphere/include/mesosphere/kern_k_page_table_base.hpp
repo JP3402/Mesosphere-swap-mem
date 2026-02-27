@@ -380,7 +380,7 @@ namespace ams::kern {
 
             KLightLock &GetLock() const { return m_general_lock; }
 
-            bool GetEntry(PageTableEntry *out, KProcessAddress virt_addr) const;
+            bool GetEntry(arch::arm64::PageTableEntry *out, KProcessAddress virt_addr) const;
 
             Result SetMemoryPermission(KProcessAddress addr, size_t size, ams::svc::MemoryPermission perm);
             Result SetProcessMemoryPermission(KProcessAddress addr, size_t size, ams::svc::MemoryPermission perm);
