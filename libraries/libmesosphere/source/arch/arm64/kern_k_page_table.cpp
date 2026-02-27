@@ -221,7 +221,13 @@ namespace ams::kern::arch::arm64 {
         KScopedLightLock lk(this->GetLock());
 
         /* Re-map page. */
-        R_TRY(this->MarkAsResident(virt_addr, phys_addr));
+        /* Note: If another thread already restored the page, we ignore the error and still wake this thread. */
+        {
+            const auto res = this->MarkAsResident(virt_addr, phys_addr);
+            if (R_FAILED(res) && !svc::ResultInvalidState::Includes(res)) {
+                return res;
+            }
+        }
 
         /* TLB Maintenance: Invalidate specific Virtual Address for the current ASID. */
         /* Note: This prevents the CPU from re-triggering the same fault due to stale TLB entries. */
@@ -232,7 +238,7 @@ namespace ams::kern::arch::arm64 {
         /* Wake up the thread. */
         KScopedSchedulerLock sl;
         if (thread->GetState() == KThread::ThreadState_Waiting) {
-            thread->SetState(KThread::ThreadState_Runnable);
+            KScheduler::SetThreadState(thread, KThread::ThreadState_Runnable);
         }
 
         R_SUCCEED();

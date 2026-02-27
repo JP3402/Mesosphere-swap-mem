@@ -121,6 +121,65 @@ namespace ams::kern::svc {
             R_RETURN(page_table.UnmapMemory(dst_address, src_address, size));
         }
 
+        Result GetSwapRequest(uint64_t *out_process_id, uint64_t *out_thread_id, ams::svc::Address *out_vaddr) {
+            KScopedSchedulerLock sl;
+
+            /* Dequeue the next thread. */
+            KThread *thread = g_SwapRequestListHead;
+            R_UNLESS(thread != nullptr, svc::ResultNotFound());
+
+            g_SwapRequestListHead = thread->GetSwapNext();
+            if (g_SwapRequestListHead == nullptr) {
+                g_SwapRequestListTail = nullptr;
+            }
+            thread->SetSwapNext(nullptr);
+
+            /* Fill in the request info. */
+            *out_process_id = thread->GetOwnerProcess()->GetId();
+            *out_thread_id  = thread->GetId();
+            *out_vaddr      = thread->GetSwapVirtualAddress();
+
+            /* Close the queue's reference to the thread. */
+            thread->Close();
+
+            R_SUCCEED();
+        }
+
+        Result MarkAsResidentAndWake(uint64_t process_id, uint64_t thread_id, ams::svc::Address vaddr, ams::svc::PhysicalAddress paddr) {
+            /* Get the process from ID. */
+            KProcess *process = KProcess::GetProcessFromId(process_id);
+            R_UNLESS(process != nullptr, svc::ResultInvalidHandle());
+            ON_SCOPE_EXIT { process->Close(); };
+
+            /* Get the thread from ID. */
+            KThread *thread = KThread::GetThreadFromId(thread_id);
+            R_UNLESS(thread != nullptr, svc::ResultInvalidHandle());
+            ON_SCOPE_EXIT { thread->Close(); };
+
+            /* Ensure the thread is owned by the process. */
+            R_UNLESS(thread->GetOwnerProcess() == process, svc::ResultInvalidHandle());
+
+            /* Ensure the fault address matches. */
+            R_UNLESS(thread->GetSwapVirtualAddress() == vaddr, svc::ResultInvalidAddress());
+
+            /* Mark as resident and wake. */
+            R_RETURN(process->GetPageTable().GetPageTableImpl().MarkAsResidentAndWake(vaddr, paddr, thread));
+        }
+
+        Result RegisterSwapEvent(ams::svc::Handle event_handle) {
+            /* Get the event from its handle. */
+            KScopedAutoObject event = GetCurrentProcess().GetHandleTable().GetObject<KEvent>(event_handle);
+            R_UNLESS(event.IsNotNull(), svc::ResultInvalidHandle());
+
+            /* Set the global swap event. */
+            if (g_SwapEvent != nullptr) {
+                g_SwapEvent->Close();
+            }
+            g_SwapEvent = event.ReleasePointerUnsafe();
+
+            R_SUCCEED();
+        }
+
     }
 
     /* =============================    64 ABI    ============================= */
@@ -157,6 +216,30 @@ namespace ams::kern::svc {
 
     Result UnmapMemory64From32(ams::svc::Address dst_address, ams::svc::Address src_address, ams::svc::Size size) {
         R_RETURN(UnmapMemory(dst_address, src_address, size));
+    }
+
+    Result GetSwapRequest64(uint64_t *out_process_id, uint64_t *out_thread_id, ams::svc::Address *out_vaddr) {
+        R_RETURN(GetSwapRequest(out_process_id, out_thread_id, out_vaddr));
+    }
+
+    Result GetSwapRequest64From32(uint64_t *out_process_id, uint64_t *out_thread_id, ams::svc::Address *out_vaddr) {
+        R_RETURN(GetSwapRequest(out_process_id, out_thread_id, out_vaddr));
+    }
+
+    Result MarkAsResidentAndWake64(uint64_t process_id, uint64_t thread_id, ams::svc::Address vaddr, ams::svc::PhysicalAddress paddr) {
+        R_RETURN(MarkAsResidentAndWake(process_id, thread_id, vaddr, paddr));
+    }
+
+    Result MarkAsResidentAndWake64From32(uint64_t process_id, uint64_t thread_id, ams::svc::Address vaddr, ams::svc::PhysicalAddress paddr) {
+        R_RETURN(MarkAsResidentAndWake(process_id, thread_id, vaddr, paddr));
+    }
+
+    Result RegisterSwapEvent64(ams::svc::Handle event_handle) {
+        R_RETURN(RegisterSwapEvent(event_handle));
+    }
+
+    Result RegisterSwapEvent64From32(ams::svc::Handle event_handle) {
+        R_RETURN(RegisterSwapEvent(event_handle));
     }
 
 }

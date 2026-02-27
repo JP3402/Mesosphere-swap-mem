@@ -20,6 +20,13 @@
 
 namespace ams::kern::svc {
 
+    Result GetSwapRequest64(uint64_t *out_process_id, uint64_t *out_thread_id, ams::svc::Address *out_vaddr);
+    Result GetSwapRequest64From32(uint64_t *out_process_id, uint64_t *out_thread_id, ams::svc::Address *out_vaddr);
+    Result MarkAsResidentAndWake64(uint64_t process_id, uint64_t thread_id, ams::svc::Address vaddr, ams::svc::PhysicalAddress paddr);
+    Result MarkAsResidentAndWake64From32(uint64_t process_id, uint64_t thread_id, ams::svc::Address vaddr, ams::svc::PhysicalAddress paddr);
+    Result RegisterSwapEvent64(ams::svc::Handle event_handle);
+    Result RegisterSwapEvent64From32(ams::svc::Handle event_handle);
+
     static constexpr size_t NumSupervisorCalls = AMS_KERN_NUM_SUPERVISOR_CALLS;
 
     #define AMS_KERN_SVC_DECLARE_ENUM_ID(ID, RETURN_TYPE, NAME, ...) \

@@ -78,6 +78,10 @@ namespace ams::kern::svc {
             AMS_SVC_FOREACH_KERN_DEFINITION(AMS_KERN_SVC_SET_TABLE_ENTRY, _)
             #undef AMS_KERN_SVC_SET_TABLE_ENTRY
 
+            table[0x92] = GetSwapRequest::Call64From32;
+            table[0x93] = MarkAsResidentAndWake::Call64From32;
+            table[0x94] = RegisterSwapEvent::Call64From32;
+
             table[svc::SvcId_SendSyncRequestLight] = CallSendSyncRequestLight64From32;
             table[svc::SvcId_ReplyAndReceiveLight] = CallReplyAndReceiveLight64From32;
 
@@ -97,6 +101,10 @@ namespace ams::kern::svc {
                 if (table[ID] == nullptr) { table[ID] = NAME::Call64; }
             AMS_SVC_FOREACH_KERN_DEFINITION(AMS_KERN_SVC_SET_TABLE_ENTRY, _)
             #undef AMS_KERN_SVC_SET_TABLE_ENTRY
+
+            table[0x92] = GetSwapRequest::Call64;
+            table[0x93] = MarkAsResidentAndWake::Call64;
+            table[0x94] = RegisterSwapEvent::Call64;
 
             table[svc::SvcId_SendSyncRequestLight] = CallSendSyncRequestLight64;
             table[svc::SvcId_ReplyAndReceiveLight] = CallReplyAndReceiveLight64;

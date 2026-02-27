@@ -342,6 +342,8 @@ namespace ams::kern {
             bool                                                m_debug_attached;
             s8                                                  m_priority_inheritance_count;
             bool                                                m_resource_limit_release_hint;
+            KThread                                            *m_swap_next;
+            KProcessAddress                                     m_swap_vaddr;
         public:
             constexpr explicit KThread(util::ConstantInitializeTag)
                 : KAutoObjectWithSlabHeapAndContainer<KThread, KWorkerTask>(util::ConstantInitialize), KTimerTask(util::ConstantInitialize),
@@ -353,7 +355,8 @@ namespace ams::kern {
                   m_wait_result{svc::ResultNoSynchronizationObject()}, m_debug_exception_result{ResultSuccess()}, m_base_priority{}, m_base_priority_on_unpin{},
                   m_physical_ideal_core_id{}, m_virtual_ideal_core_id{}, m_num_kernel_waiters{}, m_current_core_id{}, m_core_id{}, m_original_physical_affinity_mask{},
                   m_original_physical_ideal_core_id{}, m_num_core_migration_disables{}, m_thread_state{}, m_termination_requested{false}, m_wait_cancelled{},
-                  m_cancellable{}, m_signaled{}, m_initialized{}, m_debug_attached{}, m_priority_inheritance_count{}, m_resource_limit_release_hint{}
+                  m_cancellable{}, m_signaled{}, m_initialized{}, m_debug_attached{}, m_priority_inheritance_count{}, m_resource_limit_release_hint{},
+                  m_swap_next{nullptr}, m_swap_vaddr{Null<KProcessAddress>}
             {
                 /* ... */
             }
@@ -638,6 +641,11 @@ namespace ams::kern {
 
             constexpr KProcessAddress GetThreadLocalRegionAddress() const { return m_tls_address; }
             constexpr void           *GetThreadLocalRegionHeapAddress() const { return m_tls_heap_address; }
+
+            constexpr KThread *GetSwapNext() const { return m_swap_next; }
+            constexpr void SetSwapNext(KThread *t) { m_swap_next = t; }
+            constexpr KProcessAddress GetSwapVirtualAddress() const { return m_swap_vaddr; }
+            constexpr void SetSwapVirtualAddress(KProcessAddress addr) { m_swap_vaddr = addr; }
 
             constexpr KSynchronizationObject **GetSynchronizationObjectBuffer() { return std::addressof(m_sync_object_buffer.m_sync_objects[0]); }
             constexpr ams::svc::Handle *GetHandleBuffer() { return std::addressof(m_sync_object_buffer.m_handles[sizeof(m_sync_object_buffer.m_sync_objects) / (sizeof(ams::svc::Handle)) - ams::svc::ArgumentHandleCountMax]); }

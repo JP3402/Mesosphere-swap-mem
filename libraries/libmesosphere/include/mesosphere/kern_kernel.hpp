@@ -157,4 +157,10 @@ namespace ams::kern {
         return Kernel::GetScheduler();
     }
 
+    /* Swap signaling objects. */
+    extern KThread *g_SwapRequestListHead;
+    extern KThread *g_SwapRequestListTail;
+    class KEvent;
+    extern KEvent *g_SwapEvent;
+
 }

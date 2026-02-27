@@ -111,6 +111,11 @@ namespace ams::kern {
     KThread &Kernel::GetMainThread(s32 core_id) { return g_main_threads.m_arr[core_id]; }
     KThread &Kernel::GetIdleThread(s32 core_id) { return g_idle_threads.m_arr[core_id]; }
 
+    /* Swap signaling objects. */
+    KThread *g_SwapRequestListHead = nullptr;
+    KThread *g_SwapRequestListTail = nullptr;
+    KEvent  *g_SwapEvent           = nullptr;
+
     __attribute__((constructor)) void ConfigureKTargetSystem() {
         KSystemControl::ConfigureKTargetSystem();
     }

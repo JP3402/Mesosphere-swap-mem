@@ -152,16 +152,26 @@ namespace ams::kern::arch::arm64 {
                     }
 
                     /* 1. Suspend the thread and signal sys-swap via KEvent. */
-                    KThread &cur_thread = GetCurrentThread();
+                    KThread *cur_thread = GetCurrentThreadPointer();
 
-                    /* TODO: Set payload in Shared Memory region. */
-                    /* g_SwapPayload.vaddr = far; */
-                    /* g_SwapPayload.process_id = cur_process.GetId(); */
-                    /* g_SwapEvent.Signal(); */
-
+                    /* Defer to sys-swap by enqueuing the thread. */
                     {
                         KScopedSchedulerLock sl;
-                        KScheduler::SetThreadState(std::addressof(cur_thread), KThread::ThreadState_Waiting);
+                        cur_thread->Open();
+                        cur_thread->SetSwapVirtualAddress(far);
+                        cur_thread->SetSwapNext(nullptr);
+                        if (g_SwapRequestListTail != nullptr) {
+                            g_SwapRequestListTail->SetSwapNext(cur_thread);
+                        } else {
+                            g_SwapRequestListHead = cur_thread;
+                        }
+                        g_SwapRequestListTail = cur_thread;
+
+                        if (g_SwapEvent != nullptr) {
+                            g_SwapEvent->Signal();
+                        }
+
+                        KScheduler::SetThreadState(cur_thread, KThread::ThreadState_Waiting);
                     }
 
                     /* 2. Reschedule happens implicitly on return from exception handler if state is Waiting. */
