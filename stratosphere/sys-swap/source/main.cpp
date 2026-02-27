@@ -29,11 +29,16 @@ namespace ams {
         os::NativeHandle thread_handle;
     };
 
-    bool IsSdBusBusy() {
+    bool IsSdCardIdle() {
         /* Tegra X1 SDMMC4 Present State Register. */
         volatile u32 *SDMMC4_PSTR = reinterpret_cast<volatile u32 *>(0x700B0624);
-        /* Check bit 0 (Command Inhibit) and bit 1 (Data Inhibit). */
-        return (*SDMMC4_PSTR & 0x3) != 0;
+        /* Check bit 0 (Command Inhibit) and bit 1 (Data Inhibit). Both must be 0 for idle. */
+        return (*SDMMC4_PSTR & 0x00000003) == 0;
+    }
+
+    bool IsTargetProcess(u64 program_id) {
+        /* Filter specifically for Applet Manager (010000000000002B). */
+        return program_id == 0x010000000000002BULL;
     }
 
     void Main() {
@@ -44,24 +49,23 @@ namespace ams {
 
         /* 2. Main loop. */
         while (true) {
-            /* TODO: Wait for KEvent from kernel. */
-            // os::WaitEvent(g_SwapEvent);
+            /* TODO: Dequeue request from Kernel Shared Buffer. */
+            SwapRequest request;
+            bool has_request = false; // Mock
 
-            /* Hardware Gatekeeper Logic:
-               Only allow I/O when the bus is idle to ensure high priority for game assets.
-            */
-            while (IsSdBusBusy()) {
-                os::SleepThread(TimeSpan::FromMilliseconds(5));
+            if (has_request && IsTargetProcess(request.process_id)) {
+                /* Hardware Gatekeeper: Ensure SD bus is not under load from the game. */
+                while (!IsSdCardIdle()) {
+                    os::SleepThread(TimeSpan::FromMilliseconds(5));
+                }
+
+                /* Perform Raw I/O on the Swap Partition. */
+                // sdmmc::Read(sdmmc::Port_SdCard0, request.sector_offset, 8, buffer);
+                
+                /* Notify kernel to re-map and resume. */
             }
-
-            /* Dummy Logic:
-               - Dequeue request.
-               - sdmmc::Read(SdCard0, offset, 8 sectors (4KB), buffer);
-               - SvcMapMemory(target_process, resident_page, vaddr, 4096);
-               - SvcResumeThread(thread_handle);
-            */
             
-            os::SleepThread(TimeSpan::FromSeconds(1));
+            os::SleepThread(TimeSpan::FromMilliseconds(10));
         }
     }
 }

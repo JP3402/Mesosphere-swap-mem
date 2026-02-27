@@ -80,6 +80,7 @@ namespace ams::kern::arch::arm64 {
                 SoftwareReservedBit_DisableMergeHeadTail    = (1u << 2),
                 SoftwareReservedBit_Valid                   = (1u << 3),
                 SoftwareReservedBit_Swapped                 = (1u << 4),
+                SoftwareReservedBit_Dirty                   = (1u << 5),
             };
 
             static constexpr ALWAYS_INLINE std::underlying_type<SoftwareReservedBit>::type EncodeSoftwareReservedBits(bool head, bool head_body, bool tail) {
@@ -177,8 +178,9 @@ namespace ams::kern::arch::arm64 {
                 }
             }
         public:
-            constexpr ALWAYS_INLINE u8 GetSoftwareReservedBits()            const { return this->GetBits(55, 5); }
+            constexpr ALWAYS_INLINE u8 GetSoftwareReservedBits()            const { return this->GetBits(55, 6); }
             constexpr ALWAYS_INLINE bool IsSwapped()                        const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_Swapped) != 0; }
+            constexpr ALWAYS_INLINE bool IsDirty()                          const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_Dirty) != 0; }
             constexpr ALWAYS_INLINE bool IsHeadMergeDisabled()              const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_DisableMergeHead) != 0; }
             constexpr ALWAYS_INLINE bool IsHeadAndBodyMergeDisabled()       const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_DisableMergeHeadAndBody) != 0; }
             constexpr ALWAYS_INLINE bool IsTailMergeDisabled()              const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_DisableMergeHeadTail) != 0; }
@@ -222,6 +224,7 @@ namespace ams::kern::arch::arm64 {
             constexpr ALWAYS_INLINE decltype(auto) SetPageAttribute(PageAttribute a)  { this->SetBitsDirect(2, 3, a); return *this; }
             constexpr ALWAYS_INLINE decltype(auto) SetMapped(bool m)                  { static_assert(static_cast<u64>(MappingFlag_Mapped == (1 << 0))); this->SetBit(0, m); return *this; }
             constexpr ALWAYS_INLINE decltype(auto) SetSwapped(bool en)                { this->SetBit(59, en); return *this; }
+            constexpr ALWAYS_INLINE decltype(auto) SetDirty(bool en)                  { this->SetBit(60, en); return *this; }
 
             constexpr ALWAYS_INLINE u64 GetSwapOffset() const { return this->GetBits(12, 36); }
             constexpr ALWAYS_INLINE decltype(auto) SetSwapOffset(u64 offset) { this->SetBits(12, 36, offset); return *this; }

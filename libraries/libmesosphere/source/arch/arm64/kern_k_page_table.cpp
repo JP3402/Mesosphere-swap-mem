@@ -188,6 +188,48 @@ namespace ams::kern::arch::arm64 {
         R_SUCCEED();
     }
 
+    Result KPageTable::MarkAsSwappedEvict(KProcessAddress virt_addr, u64 sector_offset) {
+        MESOSPHERE_ASSERT(this->IsLockedByCurrentThread());
+
+        /* Traversal to find the entry. */
+        auto &impl = this->GetImpl();
+        TraversalContext context;
+        TraversalEntry t_entry;
+        R_UNLESS(impl.BeginTraversal(std::addressof(t_entry), std::addressof(context), virt_addr), svc::ResultInvalidAddress());
+
+        /* Ensure we are dealing with a Page descriptor. */
+        R_UNLESS(context.level == KPageTableImpl::EntryLevel_L3, svc::ResultInvalidState());
+
+        PageTableEntry entry = *context.level_entries[context.level];
+
+        /* Ensure page is resident and not already swapped. */
+        R_UNLESS(entry.IsMapped() && !entry.IsSwapped(), svc::ResultInvalidState());
+
+        /* Dirty-Page Optimization: If not dirty, we don't need to write to SD. */
+        bool is_dirty = entry.IsDirty();
+
+        if (is_dirty) {
+            /* TODO: Signal sys-swap to WRITE this page to the sector_offset. */
+            MESOSPHERE_LOG("Evicting Dirty Page: %lx -> %lx\n", virt_addr, sector_offset);
+        } else {
+            MESOSPHERE_LOG("Evicting Clean Page: %lx (discarding)\n", virt_addr);
+        }
+
+        /* Update state. */
+        entry.SetMapped(false);
+        entry.SetSwapped(true);
+        entry.SetSwapOffset(sector_offset);
+        entry.SetDirty(false); // Reset dirty bit for future residency
+
+        /* Update the entry in the table. */
+        *context.level_entries[context.level] = entry;
+
+        /* Invalidate TLB. */
+        this->NoteUpdated();
+
+        R_SUCCEED();
+    }
+
     bool KPageTable::IsAppletRegion(KProcessAddress virt_addr) const {
         /* Applet region typically starts at 0x10000000. */
         constexpr KProcessAddress AppletRegionStart = 0x10000000ul;

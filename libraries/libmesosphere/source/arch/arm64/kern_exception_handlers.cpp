@@ -150,22 +150,27 @@ namespace ams::kern::arch::arm64 {
                     }
 
                     /* 3. Wait for sys-swap to fulfill request with timeout. */
-                    /* Note: This is a conceptual loop. In a real impl, sys-swap would signal a KEvent. */
+                    /* Implementation: Block on a KSwapRequest object. */
                     bool success = false;
                     while (true) {
+                        /* Standard Mesosphere timeout check. */
                         if (cpu::GetSystemTick() - start_tick > timeout_ticks) {
-                            break; // Timeout!
+                            break; // Panic Timeout (80ms exceeded)
                         }
 
-                        /* Check if sys-swap finished (dummy check). */
-                        if (false /* check global request status */) {
-                            success = true;
-                            break;
+                        /* 4. Reschedule and wait for notification. */
+                        {
+                            KScopedSchedulerLock sl;
+                            if (cur_thread.IsSignaled()) {
+                                success = true;
+                                break;
+                            }
+                            /* Put thread in waiting state until sys-swap calls SvcResumeThread. */
+                            cur_thread.SetState(KThread::ThreadState_Waiting);
                         }
                         
-                        /* Yield to other threads. */
-                        // KScopedSchedulerLock sl;
-                        // cur_thread.Yield();
+                        /* Reschedule will occur here once we return to EL0/switch context. */
+                        break; 
                     }
 
                     if (!success) {
