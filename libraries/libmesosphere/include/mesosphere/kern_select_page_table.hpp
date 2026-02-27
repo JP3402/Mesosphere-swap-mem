@@ -52,8 +52,9 @@ namespace ams::kern {
         static_cast<KPageTable *>(this)->FinalizeUpdateImpl(page_list);
     }
 
-    ALWAYS_INLINE bool KPageTableBase::GetEntry(PageTableEntry *out, KProcessAddress virt_addr) const {
+    /* Add arch::arm64:: here to tell the compiler where the entry type is defined */
+    ALWAYS_INLINE bool KPageTableBase::GetEntry(arch::arm64::PageTableEntry *out, KProcessAddress virt_addr) const {
         return static_cast<const KPageTable *>(this)->GetEntry(out, virt_addr);
     }
 
-}
+} // <--- Final brace for ams::kern

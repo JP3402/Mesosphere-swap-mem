@@ -356,13 +356,14 @@ namespace ams::kern::arch::arm64 {
                 return m_page_table.GetLock();
             }
 
-            bool GetEntry(arch::arm64::PageTableEntry *out, KProcessAddress virt_addr) const
+            /* Ensure there is a semicolon after the closing brace of the function and the class */
+            bool GetEntry(arch::arm64::PageTableEntry *out, KProcessAddress virt_addr) const {
                 return m_page_table.GetEntry(out, virt_addr);
             }
 
             bool IsInsideAliasRegion(KProcessAddress addr) const {
                 return m_page_table.IsInAliasRegion(addr, PageSize);
             }
-    };
+    }; // <--- Ensure this semicolon and brace are here to close the class KProcessPageTable
 
-}
+} // <--- This closes the ams::kern::arch::arm64 namespace
