@@ -49,7 +49,10 @@ namespace ams {
 
         /* 2. Main loop. */
         while (true) {
-            /* TODO: Dequeue request from Kernel Shared Buffer. */
+            /* 1. Wait for Swap Signaling from Kernel. */
+            // os::WaitEvent(g_KernelSwapEvent);
+
+            /* 2. Retrieve payload from Shared Memory. */
             SwapRequest request;
             bool has_request = false; // Mock
 
@@ -59,10 +62,11 @@ namespace ams {
                     os::SleepThread(TimeSpan::FromMilliseconds(5));
                 }
 
-                /* Perform Raw I/O on the Swap Partition. */
+                /* 3. Perform Raw I/O on the Swap Partition. */
                 // sdmmc::Read(sdmmc::Port_SdCard0, request.sector_offset, 8, buffer);
                 
-                /* Notify kernel to re-map and resume. */
+                /* 4. Atomic Re-map and Resume via SVC. */
+                // SvcMarkAsResidentAndWake(request.process_id, request.vaddr, resident_pa, request.thread_handle);
             }
             
             os::SleepThread(TimeSpan::FromMilliseconds(10));

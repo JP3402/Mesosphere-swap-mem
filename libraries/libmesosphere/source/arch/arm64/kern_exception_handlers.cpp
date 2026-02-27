@@ -138,48 +138,35 @@ namespace ams::kern::arch::arm64 {
                 KScopedLightLock lk(cur_process.GetPageTable().GetLock());
                 PageTableEntry pte;
                 if (cur_process.GetPageTable().IsAppletRegion(far) && cur_process.GetPageTable().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
-                    /* 1. Track start time for panic timeout (80ms). */
+                    /* 1. Track start time for panic timeout (150ms). */
                     const s64 start_tick = cpu::GetSystemTick();
-                    const s64 timeout_ticks = 80 * 1000 * 1000; // Simplified tick conversion
+                    const s64 timeout_ticks = 150 * 1000 * 1000; // ~150ms on 19.2MHz clock
 
-                    /* 2. Suspend the thread and signal sys-swap. */
+                    /* 2. Suspend the thread and signal sys-swap via KEvent. */
                     KThread &cur_thread = GetCurrentThread();
+
+                    /* TODO: Set payload in Shared Memory region. */
+                    /* g_SwapPayload.vaddr = far; */
+                    /* g_SwapPayload.process_id = cur_process.GetId(); */
+                    /* g_SwapEvent.Signal(); */
+
                     {
                         KScopedSchedulerLock sl;
                         cur_thread.SetState(KThread::ThreadState_Waiting);
                     }
 
-                    /* 3. Wait for sys-swap to fulfill request with timeout. */
-                    /* Implementation: Block on a KSwapRequest object. */
-                    bool success = false;
-                    while (true) {
-                        /* Standard Mesosphere timeout check. */
+                    /* 3. Reschedule and wait for sys-swap to call Wakeup SVC. */
+                    while (cur_thread.GetState() == KThread::ThreadState_Waiting) {
                         if (cpu::GetSystemTick() - start_tick > timeout_ticks) {
-                            break; // Panic Timeout (80ms exceeded)
+                            MESOSPHERE_LOG("Swap Timeout (150ms): Proc=%s, Addr=%lx\n", cur_process.GetName(), far);
+                            cur_process.Exit(); // Graceful kill of the applet
+                            return;
                         }
-
-                        /* 4. Reschedule and wait for notification. */
-                        {
-                            KScopedSchedulerLock sl;
-                            if (cur_thread.IsSignaled()) {
-                                success = true;
-                                break;
-                            }
-                            /* Put thread in waiting state until sys-swap calls SvcResumeThread. */
-                            cur_thread.SetState(KThread::ThreadState_Waiting);
-                        }
-                        
-                        /* Reschedule will occur here once we return to EL0/switch context. */
+                        /* resched happens implicitly on return from exception handler if state is Waiting. */
                         break; 
                     }
 
-                    if (!success) {
-                        MESOSPHERE_LOG("Swap Timeout/Failure: Proc=%s, Addr=%lx\n", cur_process.GetName(), far);
-                        cur_process.Exit(); // Standard failure path
-                        return;
-                    }
-
-                    return; // Resumed successfully
+                    return; 
                 }
             }
 

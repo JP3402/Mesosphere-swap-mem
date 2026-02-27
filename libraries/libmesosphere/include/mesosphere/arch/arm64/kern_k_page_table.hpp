@@ -204,6 +204,7 @@ namespace ams::kern::arch::arm64 {
             bool GetEntry(PageTableEntry *out, KProcessAddress virt_addr) const;
             Result MarkAsSwapped(KProcessAddress virt_addr, u64 sector_offset);
             Result MarkAsResident(KProcessAddress virt_addr, KPhysicalAddress phys_addr);
+            Result MarkAsResidentAndWake(KProcessAddress virt_addr, KPhysicalAddress phys_addr, KThread *thread);
             Result MarkAsSwappedEvict(KProcessAddress virt_addr, u64 sector_offset);
             bool IsAppletRegion(KProcessAddress virt_addr) const;
 

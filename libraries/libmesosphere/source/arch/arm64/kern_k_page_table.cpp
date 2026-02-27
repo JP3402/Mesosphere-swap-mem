@@ -188,6 +188,22 @@ namespace ams::kern::arch::arm64 {
         R_SUCCEED();
     }
 
+    Result KPageTable::MarkAsResidentAndWake(KProcessAddress virt_addr, KPhysicalAddress phys_addr, KThread *thread) {
+        /* This function is called after sys-swap completes. */
+        KScopedLightLock lk(this->GetLock());
+
+        /* Re-map page. */
+        R_TRY(this->MarkAsResident(virt_addr, phys_addr));
+
+        /* Wake up the thread. */
+        KScopedSchedulerLock sl;
+        if (thread->GetState() == KThread::ThreadState_Waiting) {
+            thread->SetState(KThread::ThreadState_Runnable);
+        }
+
+        R_SUCCEED();
+    }
+
     Result KPageTable::MarkAsSwappedEvict(KProcessAddress virt_addr, u64 sector_offset) {
         MESOSPHERE_ASSERT(this->IsLockedByCurrentThread());
 
