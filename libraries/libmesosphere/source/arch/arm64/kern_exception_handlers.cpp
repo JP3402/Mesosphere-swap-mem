@@ -132,50 +132,66 @@ namespace ams::kern::arch::arm64 {
             }
 
             KProcess &cur_process = GetCurrentProcess();
+            KThread  &cur_thread  = GetCurrentThread();
 
             /* Check if this is a swap fault. */
             if (ec == EsrEc_InstructionAbortEl0 || ec == EsrEc_DataAbortEl0) {
                 /* ISR Safety Check: Swapping is forbidden in interrupt context. */
-                /* HandleUserException is reached via EL0 exception vectors. */
-                /* However, we must ensure we aren't servicing an actual interrupt or nested handler. */
-                if (GetCurrentThread().IsInExceptionHandler() || !KInterruptManager::AreInterruptsEnabled()) {
+                if (cur_thread.IsInExceptionHandler() || !KInterruptManager::AreInterruptsEnabled()) {
                     MESOSPHERE_PANIC("Swap fault detected in unsafe ISR/Exception context!");
                 }
 
-                KScopedLightLock lk(cur_process.GetPageTable().GetPageTableImpl().GetLock());
-                PageTableEntry pte;
-                if (cur_process.GetPageTable().IsInsideAliasRegion(far) && cur_process.GetPageTable().GetPageTableImpl().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
-                    /* Pool Safety Check: Only Application or Applet pools are allowed to swap. */
-                    const auto pool = cur_process.GetMemoryPool();
-                    if (!(pool == KMemoryManager::Pool_Application || pool == KMemoryManager::Pool_Applet)) {
-                        return;
+                /* Capture start tick for timeout logic (V1/Erista safety). */
+                const s64 start_tick = svc::GetSystemTick();
+
+                /* Check for swapped state while holding the page table lock. */
+                bool is_swapped = false;
+                {
+                    KScopedLightLock lk(cur_process.GetPageTable().GetLock());
+                    PageTableEntry pte;
+                    if (cur_process.GetPageTable().IsInsideAliasRegion(far) && cur_process.GetPageTable().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
+                        /* Pool Safety Check: Only Application or Applet pools are allowed to swap. */
+                        const auto pool = cur_process.GetMemoryPool();
+                        if (pool == KMemoryManager::Pool_Application || pool == KMemoryManager::Pool_Applet) {
+                            is_swapped = true;
+                        }
                     }
+                }
 
-                    /* 1. Suspend the thread and signal sys-swap via KEvent. */
-                    KThread *cur_thread = GetCurrentThreadPointer();
-
-                    /* Defer to sys-swap by enqueuing the thread. */
+                /* If the page is swapped, stall the thread. */
+                if (is_swapped) {
+                    /* Defer to sys-swap by enqueuing the thread and signalling the event. */
+                    /* NOTE: We MUST release the page table lock before stalling to avoid deadlock. */
                     {
                         KScopedSchedulerLock sl;
-                        cur_thread->Open();
-                        cur_thread->SetSwapVirtualAddress(far);
-                        cur_thread->SetSwapNext(nullptr);
+
+                        cur_thread.Open();
+                        cur_thread.SetSwapVirtualAddress(far);
+                        cur_thread.SetSwapNext(nullptr);
                         if (g_SwapRequestListTail != nullptr) {
-                            g_SwapRequestListTail->SetSwapNext(cur_thread);
+                            g_SwapRequestListTail->SetSwapNext(std::addressof(cur_thread));
                         } else {
-                            g_SwapRequestListHead = cur_thread;
+                            g_SwapRequestListHead = std::addressof(cur_thread);
                         }
-                        g_SwapRequestListTail = cur_thread;
+                        g_SwapRequestListTail = std::addressof(cur_thread);
 
                         if (g_SwapEvent != nullptr) {
                             g_SwapEvent->Signal();
                         }
 
-                        KScheduler::SetThreadState(cur_thread, KThread::ThreadState_Waiting);
+                        /* Stall the thread. KScheduler::SetThreadState will call OnThreadStateChanged internally. */
+                        KScheduler::SetThreadState(std::addressof(cur_thread), KThread::ThreadState_Waiting);
                     }
 
-                    /* 2. Reschedule happens implicitly on return from exception handler if state is Waiting. */
-                    return; 
+                    /* When the thread resumes here, sys-swap has marked the page as resident. */
+                    /* V1 Coherency: Cache maintenance happens in MarkAsResidentAndWake before thread resumes. */
+
+                    /* Safety limit check (approx 5 seconds at 19.2MHz). */
+                    if (svc::GetSystemTick() - start_tick > 19200000ULL * 5) {
+                        MESOSPHERE_PANIC("Swap fault timeout: sys-swap daemon unresponsive!");
+                    }
+
+                    return;
                 }
             }
 
@@ -231,7 +247,7 @@ namespace ams::kern::arch::arm64 {
                     }
 
                     /* Save the debug parameters to the current thread. */
-                    GetCurrentThread().SaveDebugParams(raw_far, raw_esr, data);
+                    cur_thread.SaveDebugParams(raw_far, raw_esr, data);
 
                     /* Get the exception type. */
                     u32 type;
@@ -294,15 +310,15 @@ namespace ams::kern::arch::arm64 {
                     }
 
                     /* Process that we're entering a usermode exception on the current thread. */
-                    GetCurrentThread().OnEnterUsermodeException();
+                    cur_thread.OnEnterUsermodeException();
                     return;
                 }
             }
 
             /* If we should, clear the thread's state as single-step. */
             #if defined(MESOSPHERE_ENABLE_HARDWARE_SINGLE_STEP)
-            if (AMS_UNLIKELY(GetCurrentThread().IsHardwareSingleStep())) {
-                GetCurrentThread().ClearHardwareSingleStep();
+            if (AMS_UNLIKELY(cur_thread.IsHardwareSingleStep())) {
+                cur_thread.ClearHardwareSingleStep();
                 cpu::MonitorDebugSystemControlRegisterAccessor().SetSoftwareStep(false).Store();
                 cpu::InstructionMemoryBarrier();
             }

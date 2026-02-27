@@ -52,4 +52,8 @@ namespace ams::kern {
         static_cast<KPageTable *>(this)->FinalizeUpdateImpl(page_list);
     }
 
+    ALWAYS_INLINE bool KPageTableBase::GetEntry(PageTableEntry *out, KProcessAddress virt_addr) const {
+        return static_cast<const KPageTable *>(this)->GetEntry(out, virt_addr);
+    }
+
 }

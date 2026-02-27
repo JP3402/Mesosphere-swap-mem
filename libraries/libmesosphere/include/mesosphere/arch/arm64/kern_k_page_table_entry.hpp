@@ -179,7 +179,7 @@ namespace ams::kern::arch::arm64 {
             }
         public:
             constexpr ALWAYS_INLINE u8 GetSoftwareReservedBits()            const { return this->GetBits(55, 6); }
-            constexpr ALWAYS_INLINE bool IsSwapped()                        const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_Swapped) != 0; }
+            constexpr ALWAYS_INLINE bool IsSwapped()                        const { return this->GetBits(52, 1) != 0; }
             constexpr ALWAYS_INLINE bool IsDirty()                          const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_Dirty) != 0; }
             constexpr ALWAYS_INLINE bool IsHeadMergeDisabled()              const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_DisableMergeHead) != 0; }
             constexpr ALWAYS_INLINE bool IsHeadAndBodyMergeDisabled()       const { return (this->GetSoftwareReservedBits() & SoftwareReservedBit_DisableMergeHeadAndBody) != 0; }
@@ -223,7 +223,7 @@ namespace ams::kern::arch::arm64 {
             constexpr ALWAYS_INLINE decltype(auto) SetUserAccessible(bool en)         { this->SetBit(6, en); return *this; }
             constexpr ALWAYS_INLINE decltype(auto) SetPageAttribute(PageAttribute a)  { this->SetBitsDirect(2, 3, a); return *this; }
             constexpr ALWAYS_INLINE decltype(auto) SetMapped(bool m)                  { static_assert(static_cast<u64>(MappingFlag_Mapped == (1 << 0))); this->SetBit(0, m); return *this; }
-            constexpr ALWAYS_INLINE decltype(auto) SetSwapped(bool en)                { this->SetBit(59, en); return *this; }
+            constexpr ALWAYS_INLINE decltype(auto) SetSwapped(bool en)                { this->SetBit(52, en); return *this; }
             constexpr ALWAYS_INLINE decltype(auto) SetDirty(bool en)                  { this->SetBit(60, en); return *this; }
 
             constexpr ALWAYS_INLINE u64 GetSwapOffset() const { return this->GetBits(12, 36); }

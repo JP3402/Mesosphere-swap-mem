@@ -252,6 +252,8 @@ namespace ams::kern {
             constexpr KProcessPageTable &GetPageTable() { return m_page_table; }
             constexpr const KProcessPageTable &GetPageTable() const { return m_page_table; }
 
+            KPageTable &GetPageTableImpl() { return m_page_table.GetPageTableImpl(); }
+
             constexpr KHandleTable &GetHandleTable() { return m_handle_table; }
             constexpr const KHandleTable &GetHandleTable() const { return m_handle_table; }
 
