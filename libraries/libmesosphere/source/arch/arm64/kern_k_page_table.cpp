@@ -188,6 +188,34 @@ namespace ams::kern::arch::arm64 {
         R_SUCCEED();
     }
 
+    Result KPageTable::EmergencyRevertSwap() {
+        /* This function is triggered by the HID kill switch. */
+        KScopedLightLock lk(this->GetLock());
+
+        /* Iterate through the entire address space and restore residency. */
+        /* This is a high-cost operation but necessary for recovery. */
+        auto &impl = this->GetImpl();
+        TraversalContext context;
+        TraversalEntry entry;
+
+        bool valid = impl.BeginTraversal(std::addressof(entry), std::addressof(context), this->GetAddressSpaceStart());
+        while (valid && entry.block_size > 0) {
+            if (context.level == KPageTableImpl::EntryLevel_L3) {
+                PageTableEntry pte = *context.level_entries[context.level];
+                if (pte.IsSwapped()) {
+                    /* TODO: Trigger high-priority fetch for this page. */
+                    /* For now, just clear the bit to stop future faults (unsafe if data not resident). */
+                    pte.SetSwapped(false);
+                    *context.level_entries[context.level] = pte;
+                }
+            }
+            valid = impl.ContinueTraversal(std::addressof(entry), std::addressof(context));
+        }
+
+        this->NoteUpdated();
+        R_SUCCEED();
+    }
+
     Result KPageTable::MarkAsResidentAndWake(KProcessAddress virt_addr, KPhysicalAddress phys_addr, KThread *thread) {
         /* This function is called after sys-swap completes. */
         KScopedLightLock lk(this->GetLock());
