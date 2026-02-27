@@ -172,7 +172,7 @@ namespace ams::kern::arch::arm64 {
         entry.SetSwapped(false);
         
         /* 2. Map the new physical page. */
-        /* We'll use a standard template for normal memory with User RW permissions. */
+        /* Memory Attributes: PageAttribute_NormalMemory (Inner/Outer WB Cacheable), Shareable_InnerShareable. */
         PageTableEntry resident_entry = PageTableEntry(PageTableEntry::BlockTag{}, phys_addr, this->GetEntryTemplate({.perm = KMemoryPermission_UserReadWrite}), 0, false, true);
 
         /* Update the entry in the table. */
@@ -195,8 +195,8 @@ namespace ams::kern::arch::arm64 {
         /* Re-map page. */
         R_TRY(this->MarkAsResident(virt_addr, phys_addr));
 
-        /* TLB Maintenance: Ensure CPU sees the new mapping immediately. */
-        /* Note: MarkAsResident already calls NoteUpdated, but we perform explicit TLB invalidation here for safety. */
+        /* TLB Maintenance: Invalidate specific Virtual Address for the current ASID. */
+        /* Note: This prevents the CPU from re-triggering the same fault due to stale TLB entries. */
         cpu::InvalidateTlbByVaDataOnly(virt_addr);
         cpu::DataSynchronizationBarrierInnerShareable();
         cpu::InstructionSynchronizationBarrier();

@@ -137,8 +137,10 @@ namespace ams::kern::arch::arm64 {
             if (ec == EsrEc_InstructionAbortEl0 || ec == EsrEc_DataAbortEl0) {
                 /* ISR Safety Check: Swapping is forbidden in interrupt context. */
                 /* HandleUserException is reached via EL0 exception vectors. */
-                /* However, we must ensure we aren't servicing a DPC or nested handler. */
-                MESOSPHERE_ABORT_UNLESS(!GetCurrentThread().IsInExceptionHandler());
+                /* However, we must ensure we aren't servicing an actual interrupt or nested handler. */
+                if (GetCurrentThread().IsInExceptionHandler() || !KInterruptManager::AreInterruptsEnabled()) {
+                    MESOSPHERE_PANIC("Swap fault detected in unsafe ISR/Exception context!");
+                }
 
                 KScopedLightLock lk(cur_process.GetPageTable().GetLock());
                 PageTableEntry pte;
