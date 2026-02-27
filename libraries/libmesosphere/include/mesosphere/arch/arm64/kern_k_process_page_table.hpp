@@ -356,7 +356,7 @@ namespace ams::kern::arch::arm64 {
                 return m_page_table.GetLock();
             }
 
-            bool GetEntry(PageTableEntry *out, KProcessAddress virt_addr) const {
+            bool GetEntry(arch::arm64::PageTableEntry *out, KProcessAddress virt_addr) const
                 return m_page_table.GetEntry(out, virt_addr);
             }
 
