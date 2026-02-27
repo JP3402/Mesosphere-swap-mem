@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <mesosphere.hpp>
+#include <mesosphere/kern_k_scheduler.hpp>
 
 namespace ams::kern::svc {
 
