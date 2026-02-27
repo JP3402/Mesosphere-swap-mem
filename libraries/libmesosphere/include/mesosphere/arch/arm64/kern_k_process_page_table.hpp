@@ -343,6 +343,14 @@ namespace ams::kern::arch::arm64 {
             KPageTableBase &GetBasePageTable() {
                 return m_page_table;
             }
+
+            KPageTable &GetPageTableImpl() {
+                return m_page_table;
+            }
+
+            bool IsInsideAliasRegion(KProcessAddress addr) const {
+                return m_page_table.IsInAliasRegion(addr, PageSize);
+            }
     };
 
 }

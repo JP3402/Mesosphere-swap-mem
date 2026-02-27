@@ -39,6 +39,7 @@ namespace ams::kern {
             friend class KConditionVariable;
             friend class KAddressArbiter;
             friend class KThreadQueue;
+            friend class KScheduler;
         public:
             static constexpr s32 MainThreadPriority = 1;
             static constexpr s32 IdleThreadPriority = 64;

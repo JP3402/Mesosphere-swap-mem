@@ -160,6 +160,10 @@ namespace ams::kern {
 
             static NOINLINE void RotateScheduledQueue(s32 core_id, s32 priority);
 
+            static void SetThreadState(KThread *thread, KThread::ThreadState state) {
+                thread->SetState(state);
+            }
+
             static NOINLINE void YieldWithoutCoreMigration();
             static NOINLINE void YieldWithCoreMigration();
             static NOINLINE void YieldToAnyThread();

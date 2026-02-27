@@ -19,12 +19,8 @@ namespace ams::kern::svc {
 
     /* =============================    Common    ============================= */
 
-    namespace {
-
-        int64_t GetSystemTick() {
-            return KHardwareTimer::GetTick();
-        }
-
+    int64_t GetSystemTick() {
+        return KHardwareTimer::GetTick();
     }
 
     /* =============================    64 ABI    ============================= */

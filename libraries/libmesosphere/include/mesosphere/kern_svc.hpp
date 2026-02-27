@@ -17,3 +17,9 @@
 #include <mesosphere/svc/kern_svc_results.hpp>
 #include <mesosphere/svc/kern_svc_k_user_pointer.hpp>
 #include <mesosphere/svc/kern_svc_prototypes.hpp>
+
+namespace ams::kern::svc {
+
+    s64 GetSystemTick();
+
+}

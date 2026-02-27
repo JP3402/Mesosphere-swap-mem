@@ -142,18 +142,16 @@ namespace ams::kern::arch::arm64 {
                     MESOSPHERE_PANIC("Swap fault detected in unsafe ISR/Exception context!");
                 }
 
-                KScopedLightLock lk(cur_process.GetPageTable().GetLock());
+                KScopedLightLock lk(cur_process.GetPageTable().GetPageTableImpl().GetLock());
                 PageTableEntry pte;
-                if (cur_process.GetPageTable().IsAppletRegion(far) && cur_process.GetPageTable().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
+                if (cur_process.GetPageTable().IsInsideAliasRegion(far) && cur_process.GetPageTable().GetPageTableImpl().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
                     /* Pool Safety Check: Only Application or Applet pools are allowed to swap. */
                     const auto pool = cur_process.GetMemoryPool();
-                    R_UNLESS(pool == KMemoryManager::Pool_Application || pool == KMemoryManager::Pool_Applet, svc::ResultInvalidState());
+                    if (!(pool == KMemoryManager::Pool_Application || pool == KMemoryManager::Pool_Applet)) {
+                        return;
+                    }
 
-                    /* 1. Track start time for panic timeout (150ms). */
-                    const s64 start_tick = cpu::GetSystemTick();
-                    const s64 timeout_ticks = 150 * 1000 * 1000; // ~150ms on 19.2MHz clock
-
-                    /* 2. Suspend the thread and signal sys-swap via KEvent. */
+                    /* 1. Suspend the thread and signal sys-swap via KEvent. */
                     KThread &cur_thread = GetCurrentThread();
 
                     /* TODO: Set payload in Shared Memory region. */
@@ -163,20 +161,10 @@ namespace ams::kern::arch::arm64 {
 
                     {
                         KScopedSchedulerLock sl;
-                        cur_thread.SetState(KThread::ThreadState_Waiting);
+                        KScheduler::SetThreadState(std::addressof(cur_thread), KThread::ThreadState_Waiting);
                     }
 
-                    /* 3. Reschedule and wait for sys-swap to call Wakeup SVC. */
-                    while (cur_thread.GetState() == KThread::ThreadState_Waiting) {
-                        if (cpu::GetSystemTick() - start_tick > timeout_ticks) {
-                            MESOSPHERE_LOG("Swap Timeout (150ms): Proc=%s, Addr=%lx\n", cur_process.GetName(), far);
-                            cur_process.Exit(); // Graceful kill of the applet
-                            return;
-                        }
-                        /* resched happens implicitly on return from exception handler if state is Waiting. */
-                        break; 
-                    }
-
+                    /* 2. Reschedule happens implicitly on return from exception handler if state is Waiting. */
                     return; 
                 }
             }
