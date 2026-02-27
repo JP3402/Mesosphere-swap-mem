@@ -135,9 +135,18 @@ namespace ams::kern::arch::arm64 {
 
             /* Check if this is a swap fault. */
             if (ec == EsrEc_InstructionAbortEl0 || ec == EsrEc_DataAbortEl0) {
+                /* ISR Safety Check: Swapping is forbidden in interrupt context. */
+                /* HandleUserException is reached via EL0 exception vectors. */
+                /* However, we must ensure we aren't servicing a DPC or nested handler. */
+                MESOSPHERE_ABORT_UNLESS(!GetCurrentThread().IsInExceptionHandler());
+
                 KScopedLightLock lk(cur_process.GetPageTable().GetLock());
                 PageTableEntry pte;
                 if (cur_process.GetPageTable().IsAppletRegion(far) && cur_process.GetPageTable().GetEntry(std::addressof(pte), far) && pte.IsSwapped()) {
+                    /* Pool Safety Check: Only Application or Applet pools are allowed to swap. */
+                    const auto pool = cur_process.GetMemoryPool();
+                    R_UNLESS(pool == KMemoryManager::Pool_Application || pool == KMemoryManager::Pool_Applet, svc::ResultInvalidState());
+
                     /* 1. Track start time for panic timeout (150ms). */
                     const s64 start_tick = cpu::GetSystemTick();
                     const s64 timeout_ticks = 150 * 1000 * 1000; // ~150ms on 19.2MHz clock

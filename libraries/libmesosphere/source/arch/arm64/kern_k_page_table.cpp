@@ -195,6 +195,12 @@ namespace ams::kern::arch::arm64 {
         /* Re-map page. */
         R_TRY(this->MarkAsResident(virt_addr, phys_addr));
 
+        /* TLB Maintenance: Ensure CPU sees the new mapping immediately. */
+        /* Note: MarkAsResident already calls NoteUpdated, but we perform explicit TLB invalidation here for safety. */
+        cpu::InvalidateTlbByVaDataOnly(virt_addr);
+        cpu::DataSynchronizationBarrierInnerShareable();
+        cpu::InstructionSynchronizationBarrier();
+
         /* Wake up the thread. */
         KScopedSchedulerLock sl;
         if (thread->GetState() == KThread::ThreadState_Waiting) {
