@@ -173,7 +173,7 @@ namespace ams::kern::arch::arm64 {
         
         /* 2. Map the new physical page. */
         /* Memory Attributes: PageAttribute_NormalMemory (Inner/Outer WB Cacheable), Shareable_InnerShareable. */
-        PageTableEntry resident_entry = PageTableEntry(PageTableEntry::BlockTag{}, phys_addr, this->GetEntryTemplate({.perm = KMemoryPermission_UserReadWrite}), 0, false, true);
+        PageTableEntry resident_entry = PageTableEntry(PageTableEntry::BlockTag{}, phys_addr, this->GetEntryTemplate({.perm = KMemoryPermission_UserReadWrite, .io = false, .uncached = false, .disable_merge_attributes = DisableMergeAttribute_None}), 0, false, true);
 
         /* Update the entry in the table. */
         *context.level_entries[context.level] = resident_entry;
@@ -233,7 +233,7 @@ namespace ams::kern::arch::arm64 {
         /* Note: This prevents the CPU from re-triggering the same fault due to stale TLB entries. */
         cpu::InvalidateTlbByVaDataOnly(virt_addr);
         cpu::DataSynchronizationBarrierInnerShareable();
-        cpu::InstructionSynchronizationBarrier();
+        cpu::DataSynchronizationBarrier();
 
         /* Wake up the thread. */
         KScopedSchedulerLock sl;

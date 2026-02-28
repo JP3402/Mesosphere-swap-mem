@@ -188,7 +188,7 @@ namespace ams::kern::arch::arm64 {
                     /* V1 Coherency: Cache maintenance happens in MarkAsResidentAndWake before thread resumes. */
 
                     /* Safety limit check (approx 5 seconds at 19.2MHz). */
-                    if (svc::GetSystemTick() - start_tick > 19200000ULL * 5) {
+                    if (svc::GetSystemTick() - start_tick > 96000000) {
                         MESOSPHERE_PANIC("Swap fault timeout: sys-swap daemon unresponsive!");
                     }
 

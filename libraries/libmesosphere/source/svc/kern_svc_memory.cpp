@@ -137,7 +137,8 @@ namespace ams::kern::svc {
             /* Fill in the request info. */
             *out_process_id = thread->GetOwnerProcess()->GetId();
             *out_thread_id  = thread->GetId();
-            *out_vaddr      = thread->GetSwapVirtualAddress();
+			auto temp_addr = thread->GetSwapVirtualAddress();
+            *out_vaddr = ams::svc::Address(*reinterpret_cast<const u64*>(&temp_addr));
 
             /* Close the queue's reference to the thread. */
             thread->Close();
@@ -163,7 +164,8 @@ namespace ams::kern::svc {
             R_UNLESS(thread->GetSwapVirtualAddress() == vaddr, svc::ResultInvalidAddress());
 
             /* Mark as resident and wake. */
-            R_RETURN(process->GetPageTable().GetPageTableImpl().MarkAsResidentAndWake(vaddr, paddr, thread));
+			auto temp_vaddr = vaddr;
+            R_RETURN(process->GetPageTable().GetPageTableImpl().MarkAsResidentAndWake(KProcessAddress(*reinterpret_cast<const u64*>(&temp_vaddr)), KPhysicalAddress(paddr), thread));
         }
 
         Result RegisterSwapEvent(ams::svc::Handle event_handle) {
